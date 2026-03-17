@@ -34,15 +34,38 @@ def fetch_historical_data(ticker: str, start_date: str = "2020-01-01", end_date:
 
 def fetch_live_data(ticker: str) -> dict:
     """Fetches exact real-time tick for current price and today's open."""
-    df = yf.download(ticker, period="5d", interval="1m", progress=False)
-    if df.empty:
-        return {"current_price": 0.0, "today_open": 0.0}
-    
-    if isinstance(df.columns, pd.MultiIndex):
-        df.columns = [col[0].lower() for col in df.columns]
-    else:
-        df.columns = [col.lower() for col in df.columns]
+    try:
+        t = yf.Ticker(ticker)
+        fast = t.fast_info
         
-    current_price = float(df['close'].iloc[-1])
-    today_open = float(df['open'].iloc[0])
-    return {"current_price": current_price, "today_open": today_open}
+        current_price = float(fast.last_price)
+        today_open = float(fast.open)
+        
+        # If fast_info fails to populate, fallback to 1d download
+        if not current_price or not today_open:
+            raise ValueError("fast_info empty")
+            
+        return {"current_price": current_price, "today_open": today_open}
+        
+    except Exception:
+        # Fallback to 1m history just for today
+        df = yf.download(ticker, period="1d", interval="1m", progress=False)
+        if df.empty:
+            # Absolute fallback to larger period
+            df = yf.download(ticker, period="5d", interval="1m", progress=False)
+            if df.empty:
+                return {"current_price": 0.0, "today_open": 0.0}
+        
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = [col[0].lower() for col in df.columns]
+        else:
+            df.columns = [col.lower() for col in df.columns]
+            
+        # Group by date to get the ACTUAL open of the latest available day
+        df['dt_date'] = df.index.date
+        latest_date = df['dt_date'].iloc[-1]
+        today_data = df[df['dt_date'] == latest_date]
+        
+        current_price = float(today_data['close'].iloc[-1])
+        today_open = float(today_data['open'].iloc[0])
+        return {"current_price": current_price, "today_open": today_open}

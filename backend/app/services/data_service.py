@@ -7,10 +7,10 @@ def fetch_historical_data(ticker: str, start_date: str = "2020-01-01", end_date:
     Fetch historical OHLCV data from yfinance.
     Uses caching logic implicitly when we connect this to Redis later.
     """
-    if not end_date:
-        end_date = datetime.now().strftime("%Y-%m-%d")
-        
-    df = yf.download(ticker, start=start_date, end=end_date, progress=False)
+    if end_date:
+        df = yf.download(ticker, start=start_date, end=end_date, progress=False)
+    else:
+        df = yf.download(ticker, start=start_date, progress=False)
     
     if df.empty:
         raise ValueError(f"No data found for ticker {ticker}")
@@ -34,7 +34,7 @@ def fetch_historical_data(ticker: str, start_date: str = "2020-01-01", end_date:
 
 def fetch_live_data(ticker: str) -> dict:
     """Fetches exact real-time tick for current price and today's open."""
-    df = yf.download(ticker, period="1d", interval="1m", progress=False)
+    df = yf.download(ticker, period="5d", interval="1m", progress=False)
     if df.empty:
         return {"current_price": 0.0, "today_open": 0.0}
     
